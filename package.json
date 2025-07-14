@@ -26,6 +26,7 @@
     "mongoose": "^8.16.1",
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
+    "nodemailer": "^7.0.5",
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
@@ -39,6 +40,7 @@
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.0.8",
+    "@types/nodemailer": "^6.4.17",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

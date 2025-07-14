@@ -4,6 +4,7 @@ import {
   updateMe,
   deleteMe,
   updateProfilePicture,
+  changePassword,
   getAllUsers,
   getUserById,
   updateUserById,
@@ -24,6 +25,7 @@ router.patch(
   upload.single("picture"),
   updateProfilePicture
 );
+router.patch("/change-password", protect, changePassword);
 
 // Routes for admin only
 router.get("/", protect, adminProtect, getAllUsers);

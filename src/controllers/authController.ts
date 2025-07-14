@@ -1,11 +1,17 @@
 import { Request, Response } from "express";
 import UserModel from "../models/user.model";
 import RefreshTokenModel from "../models/refreshToken.model";
+
 import { asyncHandler } from "../middlewares/errorMiddleware";
 import { AppError } from "../middlewares/errorMiddleware";
-import crypto from "crypto";
+
 import { RegisterUserDto, LoginUserDto } from "../dtos/auth.dto";
 import { generateAccessToken } from "../utils/generateToken";
+import { forgotPasswordTemplate } from "../utils/forgotPasswordTemplate";
+import sendEmail from "../utils/sendEmail";
+
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 // Register Controller
 export const registerUser = asyncHandler(
@@ -147,3 +153,70 @@ export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
     message: "Logged out successfully",
   });
 });
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new AppError("Please provide your email address", 400);
+  }
+
+  const user = await UserModel.findOne({ email });
+
+  if (!user) {
+    throw new AppError("No user found with this email", 404);
+  }
+
+  const resetToken = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_ACCESS_SECRET as string,
+    { expiresIn: "15m" }
+  );
+
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+  const html = forgotPasswordTemplate(user.name, resetUrl);
+
+  await sendEmail({
+    to: user.email,
+    subject: "Reset Your Password",
+    html,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Reset link has been sent to your email.",
+  });
+});
+
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      throw new AppError("Token and new password are required", 400);
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as {
+        userId: string;
+      };
+    } catch (err) {
+      throw new AppError("Invalid or expired token", 401);
+    }
+
+    const user = await UserModel.findById(decoded.userId);
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully",
+    });
+  }
+);

@@ -55,6 +55,41 @@ export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+export const changePassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new AppError("User not authenticated", 401);
+    }
+
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      throw new AppError("Old and new passwords are required", 400);
+    }
+
+    const user = await UserModel.findById(req.user._id);
+
+    if (!user || !(await user.comparePassword(oldPassword))) {
+      throw new AppError("Your current password is incorrect", 400);
+    }
+
+    if (oldPassword === newPassword) {
+      throw new AppError(
+        "New password must be different from the old password",
+        400
+      );
+    }
+
+    user.password = newPassword; 
+    await user.save(); 
+
+    res.status(200).json({
+      success: true,
+      message: "Your password has been changed successfully",
+    });
+  }
+);
+
 export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError("User not authenticated", 401);
