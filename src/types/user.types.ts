@@ -1,3 +1,5 @@
+import { Document, Types } from "mongoose";
+
 export type UserRole = "user" | "admin";
 
 export interface IUser {
@@ -8,4 +10,10 @@ export interface IUser {
   role?: UserRole;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+// Extended Mongoose document with instance method
+export interface UserDocument extends Omit<IUser, "_id">, Document {
+  _id: Types.ObjectId;
+  comparePassword(enteredPassword: string): Promise<boolean>;
 }

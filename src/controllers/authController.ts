@@ -1,13 +1,11 @@
 import { Request, Response } from "express";
 import UserModel from "../models/user.model";
+import RefreshTokenModel from "../models/refreshToken.model";
 import { asyncHandler } from "../middlewares/errorMiddleware";
 import { AppError } from "../middlewares/errorMiddleware";
-import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { RegisterUserDto, LoginUserDto } from "../dtos/auth.dto";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "../utils/generateToken";
+import { generateAccessToken } from "../utils/generateToken";
 
 // Register Controller
 export const registerUser = asyncHandler(
@@ -63,7 +61,14 @@ export const loginUser = asyncHandler(
     }
 
     const accessToken = generateAccessToken(user._id.toString());
-    const refreshToken = generateRefreshToken(user._id.toString());
+    const refreshToken = crypto.randomBytes(40).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await RefreshTokenModel.create({
+      user: user._id,
+      token: refreshToken,
+      expiresAt,
+    });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -94,22 +99,26 @@ export const loginUser = asyncHandler(
 // refreshToken Controller
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response) => {
-    const refreshToken = req.cookies.refreshToken;
+    const receivedToken = req.cookies.refreshToken;
 
-    if (!refreshToken) {
+    if (!receivedToken) {
       throw new AppError("Refresh token missing", 401);
     }
 
-    const decoded = jwt.verify(
-      refreshToken,
-      process.env.JWT_REFRESH_SECRET as string
-    ) as { userId: string };
+    // Check token in DB
+    const storedToken = await RefreshTokenModel.findOne({
+      token: receivedToken,
+    });
+    if (!storedToken || storedToken.expiresAt < new Date()) {
+      throw new AppError("Invalid or expired refresh token", 401);
+    }
 
-    const user = await UserModel.findById(decoded.userId);
+    const user = await UserModel.findById(storedToken.user);
     if (!user) {
       throw new AppError("User not found", 401);
     }
 
+    // Generate new access token
     const accessToken = generateAccessToken(user._id.toString());
 
     res.status(200).json({
@@ -121,11 +130,17 @@ export const refreshToken = asyncHandler(
 
 // Logout Controller
 export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  const receivedToken = req.cookies.refreshToken;
+
+  if (receivedToken) {
+    await RefreshTokenModel.deleteOne({ token: receivedToken });
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+  }
 
   res.status(200).json({
     success: true,

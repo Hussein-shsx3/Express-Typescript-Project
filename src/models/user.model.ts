@@ -1,12 +1,6 @@
-import mongoose, { Schema, Document, Types } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-import { IUser } from "../types/user.types";
-
-// Extend Document to include instance methods
-export interface UserDocument extends Omit<IUser, "_id">, Document {
-  _id: Types.ObjectId;
-  comparePassword(enteredPassword: string): Promise<boolean>;
-}
+import { UserDocument } from "../types/user.types";
 
 const userSchema = new Schema<UserDocument>(
   {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import UserModel, { UserDocument } from "../models/user.model";
+import { UserDocument } from "../types/user.types";
+import UserModel from "../models/user.model";
 import { AppError, asyncHandler } from "./errorMiddleware";
 
 declare module "express-serve-static-core" {
@@ -39,3 +40,19 @@ export const protect = asyncHandler(
     next();
   }
 );
+
+export const adminProtect = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    throw new AppError("Not authorized", 401);
+  }
+
+  if (req.user.role !== "admin") {
+    throw new AppError("Access denied. Admins only.", 403);
+  }
+
+  next();
+};
