@@ -1,7 +1,10 @@
-export const forgotPasswordTemplate = (
-  name: string,
-  resetUrl: string
-): string => `
+export const forgotPasswordTemplate = ({
+  name,
+  resetUrl,
+}: {
+  name: string;
+  resetUrl: string;
+}): string => `
   <h2>Password Reset Request</h2>
   <p>Hello ${name},</p>
   <p>You requested to reset your password. Please click the link below to proceed:</p>

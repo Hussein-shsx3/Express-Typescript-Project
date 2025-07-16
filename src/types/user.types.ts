@@ -7,7 +7,12 @@ export interface IUser {
   email: string;
   password: string;
   picture?: string;
-  role?: UserRole;
+  role: UserRole;
+
+  isVerified: boolean;
+  verificationToken?: string | null;
+  verificationTokenExpires?: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

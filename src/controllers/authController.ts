@@ -8,12 +8,16 @@ import { AppError } from "../middlewares/errorMiddleware";
 import { RegisterUserDto, LoginUserDto } from "../dtos/auth.dto";
 import { generateAccessToken } from "../utils/generateToken";
 import { forgotPasswordTemplate } from "../utils/forgotPasswordTemplate";
+import { emailVerificationTemplate } from "../utils/emailVerificationTemplate";
+import { generateVerificationToken } from "../utils/generateVerificationToken";
 import sendEmail from "../utils/sendEmail";
 
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
-// Register Controller
+// ====================
+// REGISTER USER
+// ====================
 export const registerUser = asyncHandler(
   async (req: Request<{}, {}, RegisterUserDto>, res: Response) => {
     const { name, email, password } = req.body;
@@ -31,28 +35,39 @@ export const registerUser = asyncHandler(
       name,
       email,
       password,
+      isVerified: false,
     });
 
-    const userResponse = {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      picture: user.picture,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+    const { token, expires } = generateVerificationToken();
+
+    user.verificationToken = token;
+    user.verificationTokenExpires = expires;
+    await user.save();
+
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+
+    const emailHtml = emailVerificationTemplate({
+      name,
+      verifyUrl,
+    });
+
+    await sendEmail({
+      to: email,
+      subject: "Verify Your Email",
+      html: emailHtml,
+    });
 
     res.status(201).json({
       success: true,
-      data: userResponse,
       message:
-        "User registered successfully. Please login to get your access token.",
+        "User registered successfully. Please check your email to verify your account.",
     });
   }
 );
 
-//   Login Controller
+// ====================
+// LOGIN USER
+// ====================
 export const loginUser = asyncHandler(
   async (req: Request<{}, {}, LoginUserDto>, res: Response) => {
     const { email, password } = req.body;
@@ -62,12 +77,22 @@ export const loginUser = asyncHandler(
     }
 
     const user = await UserModel.findOne({ email });
+
     if (!user || !(await user.comparePassword(password))) {
       throw new AppError("Invalid email or password", 401);
     }
 
+    if (!user.isVerified) {
+      throw new AppError(
+        "Your account is not verified. Please check your email.",
+        403
+      );
+    }
+
     const accessToken = generateAccessToken(user._id.toString());
+
     const refreshToken = crypto.randomBytes(40).toString("hex");
+
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await RefreshTokenModel.create({
@@ -102,7 +127,9 @@ export const loginUser = asyncHandler(
   }
 );
 
-// refreshToken Controller
+// ====================
+// REFRESH ACCESS TOKEN
+// ====================
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response) => {
     const receivedToken = req.cookies.refreshToken;
@@ -111,7 +138,6 @@ export const refreshToken = asyncHandler(
       throw new AppError("Refresh token missing", 401);
     }
 
-    // Check token in DB
     const storedToken = await RefreshTokenModel.findOne({
       token: receivedToken,
     });
@@ -124,7 +150,6 @@ export const refreshToken = asyncHandler(
       throw new AppError("User not found", 401);
     }
 
-    // Generate new access token
     const accessToken = generateAccessToken(user._id.toString());
 
     res.status(200).json({
@@ -134,7 +159,9 @@ export const refreshToken = asyncHandler(
   }
 );
 
-// Logout Controller
+// ====================
+// LOGOUT USER
+// ====================
 export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   const receivedToken = req.cookies.refreshToken;
 
@@ -154,6 +181,9 @@ export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+// ====================
+// FORGOT PASSWORD - SEND RESET EMAIL
+// ====================
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -175,7 +205,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
-  const html = forgotPasswordTemplate(user.name, resetUrl);
+  const html = forgotPasswordTemplate({ name: user.name, resetUrl });
 
   await sendEmail({
     to: user.email,
@@ -189,6 +219,9 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   });
 });
 
+// ====================
+// RESET PASSWORD - UPDATE PASSWORD
+// ====================
 export const resetPassword = asyncHandler(
   async (req: Request, res: Response) => {
     const { token, newPassword } = req.body;
@@ -217,6 +250,78 @@ export const resetPassword = asyncHandler(
     res.status(200).json({
       success: true,
       message: "Password has been reset successfully",
+    });
+  }
+);
+
+// ====================
+// VERIFY EMAIL USING TOKEN
+// ====================
+export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  const { token } = req.query;
+
+  if (!token || typeof token !== "string") {
+    throw new AppError("Verification token is missing or invalid", 400);
+  }
+
+  const user = await UserModel.findOne({
+    verificationToken: token,
+    verificationTokenExpires: { $gt: new Date() },
+  });
+
+  if (!user) {
+    throw new AppError("Invalid or expired verification token", 400);
+  }
+
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  user.verificationTokenExpires = undefined;
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully. You can now log in.",
+  });
+});
+
+// ====================
+// RESEND EMAIL VERIFICATION
+// ====================
+export const resendVerification = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email } = req.body;
+
+    if (!email) throw new AppError("Email is required", 400);
+
+    const user = await UserModel.findOne({ email });
+    if (!user) throw new AppError("User not found", 404);
+
+    if (user.isVerified) {
+      throw new AppError("User already verified", 400);
+    }
+
+    const { token, expires } = generateVerificationToken();
+    user.verificationToken = token;
+    user.verificationTokenExpires = expires;
+    await user.save();
+
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+
+    const html = emailVerificationTemplate({
+      name: user.name,
+      verifyUrl,
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject: "Resend Email Verification",
+      html,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Verification email resent. Please check your inbox.",
     });
   }
 );

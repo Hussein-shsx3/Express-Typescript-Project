@@ -11,7 +11,7 @@ import {
   deleteUserById,
 } from "../controllers/userController";
 import { protect, adminProtect } from "../middlewares/authMiddleware";
-import upload from "../middlewares/multer";
+import upload from "../middlewares/multerMiddleware";
 
 const router = express.Router();
 

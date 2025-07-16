@@ -1,6 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-import { UserDocument } from "../types/user.types";
+import { UserDocument } from "../modu/user/user.types";
 
 const userSchema = new Schema<UserDocument>(
   {
@@ -30,6 +30,12 @@ const userSchema = new Schema<UserDocument>(
       enum: ["user", "admin"],
       default: "user",
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: String,
+    verificationTokenExpires: Date,
   },
   {
     timestamps: true,
@@ -44,7 +50,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Add comparePassword method
+// Compare Password Method
 userSchema.methods.comparePassword = async function (
   enteredPassword: string
 ): Promise<boolean> {

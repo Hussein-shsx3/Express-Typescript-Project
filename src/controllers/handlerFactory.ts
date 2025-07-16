@@ -3,7 +3,9 @@ import { Model, PopulateOptions } from "mongoose";
 import { asyncHandler } from "../middlewares/errorMiddleware";
 import { AppError } from "../middlewares/errorMiddleware";
 
-// Get All
+// ====================
+// GET ALL DOCUMENTS WITH PAGINATION
+// ====================
 export const getAll = <T>(Model: Model<T>) =>
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     let { page = "1", limit = "10" } = req.query;
@@ -34,13 +36,15 @@ export const getAll = <T>(Model: Model<T>) =>
       data: docs,
     });
   });
-
-// Get One
+  
+// ====================
+// GET ONE DOCUMENT BY ID (WITH OPTIONAL POPULATION)
+// ====================
 export const getOne = <T>(
   Model: Model<T>,
   populateOptions?: PopulateOptions | (string | PopulateOptions)[]
 ) =>
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: Request, res: Response) => {
     let query = Model.findById(req.params.id);
 
     if (populateOptions) {
@@ -59,7 +63,9 @@ export const getOne = <T>(
     });
   });
 
-// Create One
+// ====================
+// CREATE A NEW DOCUMENT
+// ====================
 export const createOne = <T>(Model: Model<T>) =>
   asyncHandler(async (req: Request, res: Response) => {
     const doc = await Model.create(req.body);
@@ -69,7 +75,9 @@ export const createOne = <T>(Model: Model<T>) =>
     });
   });
 
-// Update One
+// ====================
+// UPDATE A DOCUMENT BY ID
+// ====================
 export const updateOne = <T>(Model: Model<T>) =>
   asyncHandler(async (req: Request, res: Response) => {
     const doc = await Model.findByIdAndUpdate(req.params.id, req.body, {
@@ -85,7 +93,9 @@ export const updateOne = <T>(Model: Model<T>) =>
     });
   });
 
-// Delete One
+// ====================
+// DELETE A DOCUMENT BY ID
+// ====================
 export const deleteOne = <T>(Model: Model<T>) =>
   asyncHandler(async (req: Request, res: Response) => {
     const doc = await Model.findByIdAndDelete(req.params.id);

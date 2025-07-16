@@ -2,8 +2,11 @@ import { Request, Response } from "express";
 import UserModel from "../models/user.model";
 import { asyncHandler, AppError } from "../middlewares/errorMiddleware";
 import cloudinary from "../config/cloudinary";
-import { getAll, getOne, deleteOne } from "./handlerFactory";
+import { getAll, getOne, deleteOne } from "../shared/handlerFactory";
 
+// ====================
+// GET CURRENT AUTHENTICATED USER PROFILE
+// ====================
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError("User not authenticated", 401);
@@ -23,6 +26,9 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+// ====================
+// UPDATE CURRENT AUTHENTICATED USER PROFILE (NAME/EMAIL)
+// ====================
 export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError("User not authenticated", 401);
@@ -55,6 +61,9 @@ export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+// ====================
+// CHANGE PASSWORD FOR AUTHENTICATED USER
+// ====================
 export const changePassword = asyncHandler(
   async (req: Request, res: Response) => {
     if (!req.user) {
@@ -80,8 +89,8 @@ export const changePassword = asyncHandler(
       );
     }
 
-    user.password = newPassword; 
-    await user.save(); 
+    user.password = newPassword;
+    await user.save();
 
     res.status(200).json({
       success: true,
@@ -90,6 +99,9 @@ export const changePassword = asyncHandler(
   }
 );
 
+// ====================
+// DELETE CURRENT AUTHENTICATED USER ACCOUNT
+// ====================
 export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError("User not authenticated", 401);
@@ -113,6 +125,9 @@ export const deleteMe = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+// ====================
+// UPDATE PROFILE PICTURE FOR AUTHENTICATED USER
+// ====================
 export const updateProfilePicture = asyncHandler(
   async (req: Request, res: Response) => {
     if (!req.user) {
@@ -154,6 +169,9 @@ export const updateProfilePicture = asyncHandler(
   }
 );
 
+// ====================
+// UPDATE USER BY ADMIN (NAME/EMAIL/ROLE)
+// ====================
 export const updateUserById = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -184,6 +202,17 @@ export const updateUserById = asyncHandler(
   }
 );
 
+// ====================
+// ADMIN: GET ALL USERS
+// ====================
 export const getAllUsers = getAll(UserModel);
+
+// ====================
+// ADMIN: GET USER BY ID
+// ====================
 export const getUserById = getOne(UserModel);
+
+// ====================
+// ADMIN: DELETE USER BY ID
+// ====================
 export const deleteUserById = deleteOne(UserModel);
