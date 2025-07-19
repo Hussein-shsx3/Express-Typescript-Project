@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import UserModel from "../models/user.model";
 import { asyncHandler, AppError } from "../middlewares/errorMiddleware";
 import cloudinary from "../config/cloudinary";
-import { getAll, getOne, deleteOne } from "../shared/handlerFactory";
+import { getAll, getOne, deleteOne } from "./handlerFactory";
 
 // ====================
 // GET CURRENT AUTHENTICATED USER PROFILE

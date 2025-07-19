@@ -13,6 +13,12 @@ export interface IUser {
   verificationToken?: string | null;
   verificationTokenExpires?: Date | null;
 
+  resetPasswordToken?: string | null;
+  resetPasswordExpires?: Date | null;
+
+  lastLoginAt?: Date;
+  lastLoginIp?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

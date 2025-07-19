@@ -6,14 +6,14 @@ import { asyncHandler } from "../middlewares/errorMiddleware";
 import { AppError } from "../middlewares/errorMiddleware";
 
 import { RegisterUserDto, LoginUserDto } from "../dtos/auth.dto";
-import { generateAccessToken } from "../utils/generateToken";
-import { forgotPasswordTemplate } from "../utils/forgotPasswordTemplate";
-import { emailVerificationTemplate } from "../utils/emailVerificationTemplate";
-import { generateVerificationToken } from "../utils/generateVerificationToken";
+import {
+  generateAccessToken,
+  generateVerificationToken,
+  generateRefreshToken,
+} from "../utils/generateToken";
+import { forgotPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate";
+import { emailVerificationTemplate } from "../utils/emailTemplates/emailVerificationTemplate";
 import sendEmail from "../utils/sendEmail";
-
-import jwt from "jsonwebtoken";
-import crypto from "crypto";
 
 // ====================
 // REGISTER USER
@@ -77,7 +77,6 @@ export const loginUser = asyncHandler(
     }
 
     const user = await UserModel.findOne({ email });
-
     if (!user || !(await user.comparePassword(password))) {
       throw new AppError("Invalid email or password", 401);
     }
@@ -91,9 +90,7 @@ export const loginUser = asyncHandler(
 
     const accessToken = generateAccessToken(user._id.toString());
 
-    const refreshToken = crypto.randomBytes(40).toString("hex");
-
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const { token: refreshToken, expiresAt } = generateRefreshToken();
 
     await RefreshTokenModel.create({
       user: user._id,
@@ -105,8 +102,12 @@ export const loginUser = asyncHandler(
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
+
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = req.ip;
+    await user.save();
 
     res.status(200).json({
       success: true,
@@ -184,40 +185,46 @@ export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
 // ====================
 // FORGOT PASSWORD - SEND RESET EMAIL
 // ====================
-export const forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
+export const forgotPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email } = req.body;
 
-  if (!email) {
-    throw new AppError("Please provide your email address", 400);
+    if (!email) {
+      throw new AppError("Please provide your email address", 400);
+    }
+
+    const user = await UserModel.findOne({ email });
+
+    if (!user) {
+      throw new AppError("No user found with this email", 404);
+    }
+
+    const { token: resetToken, expires } = generateVerificationToken();
+
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = expires;
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    const html = forgotPasswordTemplate({
+      name: user.name,
+      resetUrl,
+    });
+
+    // Send email
+    await sendEmail({
+      to: user.email,
+      subject: "Reset Your Password",
+      html,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Reset link has been sent to your email.",
+    });
   }
-
-  const user = await UserModel.findOne({ email });
-
-  if (!user) {
-    throw new AppError("No user found with this email", 404);
-  }
-
-  const resetToken = jwt.sign(
-    { userId: user._id },
-    process.env.JWT_ACCESS_SECRET as string,
-    { expiresIn: "15m" }
-  );
-
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
-  const html = forgotPasswordTemplate({ name: user.name, resetUrl });
-
-  await sendEmail({
-    to: user.email,
-    subject: "Reset Your Password",
-    html,
-  });
-
-  res.status(200).json({
-    success: true,
-    message: "Reset link has been sent to your email.",
-  });
-});
+);
 
 // ====================
 // RESET PASSWORD - UPDATE PASSWORD
@@ -230,21 +237,20 @@ export const resetPassword = asyncHandler(
       throw new AppError("Token and new password are required", 400);
     }
 
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as {
-        userId: string;
-      };
-    } catch (err) {
-      throw new AppError("Invalid or expired token", 401);
-    }
+    const user = await UserModel.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+    });
 
-    const user = await UserModel.findById(decoded.userId);
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError("Invalid or expired reset token", 400);
     }
 
     user.password = newPassword;
+
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
     await user.save();
 
     res.status(200).json({

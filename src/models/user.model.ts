@@ -1,6 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-import { UserDocument } from "../modu/user/user.types";
+import { UserDocument } from "../types/user.types";
 
 const userSchema = new Schema<UserDocument>(
   {
@@ -34,8 +34,12 @@ const userSchema = new Schema<UserDocument>(
       type: Boolean,
       default: false,
     },
-    verificationToken: String,
-    verificationTokenExpires: Date,
+    verificationToken: { type: String, default: null, index: true },
+    verificationTokenExpires: { type: Date, default: null },
+    resetPasswordToken: { type: String, default: null, index: true },
+    resetPasswordExpires: { type: Date, default: null },
+    lastLoginAt: { type: Date },
+    lastLoginIp: { type: String },
   },
   {
     timestamps: true,
