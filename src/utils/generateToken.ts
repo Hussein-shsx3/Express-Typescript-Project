@@ -3,7 +3,7 @@ import crypto from "crypto";
 
 export const generateAccessToken = (userId: string) => {
   return jwt.sign({ userId }, process.env.JWT_ACCESS_SECRET as string, {
-    expiresIn: "15m", // 15 minutes
+    expiresIn: "1h", // 1 hour expiry
   });
 };
 
