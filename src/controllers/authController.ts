@@ -231,10 +231,21 @@ export const forgotPassword = asyncHandler(
 // ====================
 export const resetPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { token, newPassword } = req.body;
+    const { token, newPassword, confirmPassword } = req.body;
 
-    if (!token || !newPassword) {
-      throw new AppError("Token and new password are required", 400);
+    if (!token || !newPassword || !confirmPassword) {
+      throw new AppError(
+        "Token, new password, and confirm password are required",
+        400
+      );
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new AppError("Passwords do not match", 400);
+    }
+
+    if (newPassword.length < 8) {
+      throw new AppError("Password must be at least 8 characters long", 400);
     }
 
     const user = await UserModel.findOne({
@@ -255,7 +266,8 @@ export const resetPassword = asyncHandler(
 
     res.status(200).json({
       success: true,
-      message: "Password has been reset successfully",
+      message:
+        "Password has been reset successfully. Please log in with your new password.",
     });
   }
 );
