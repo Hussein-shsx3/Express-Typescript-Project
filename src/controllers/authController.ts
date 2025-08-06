@@ -88,7 +88,7 @@ export const loginUser = asyncHandler(
       );
     }
 
-    const accessToken = generateAccessToken(user._id.toString());
+    const accessToken = generateAccessToken(user._id.toString(), user.role);
 
     const { token: refreshToken, expiresAt } = generateRefreshToken();
 
@@ -151,7 +151,7 @@ export const refreshToken = asyncHandler(
       throw new AppError("User not found", 401);
     }
 
-    const accessToken = generateAccessToken(user._id.toString());
+    const accessToken = generateAccessToken(user._id.toString(), user.role);
 
     res.status(200).json({
       success: true,
